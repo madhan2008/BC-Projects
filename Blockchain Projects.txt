@@ -1,4 +1,4 @@
-Insurance Project 1:
+			Project 1: Insurance 
 
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
@@ -91,7 +91,7 @@ contract InsuranceContract {
 }
 
 
-			Rental Agreement Project 2:
+			Project 2: Rental Agreement 
 
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
@@ -301,7 +301,7 @@ contract PropertyRental {
 } 
 
 
-			Insurance Version_1
+			Project 1: Insurance Version_1
 
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
@@ -408,7 +408,7 @@ contract InsuranceContract {
     }
 }
 
-						Electronc Medical Health Record
+						Project 3: Electronc Medical Health Record
 
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
@@ -504,6 +504,175 @@ function withdrawWallet(uint256 _amount) external {
     // Check wallet balance
     function getWalletBalance(address _patient) external view returns (uint256) {
         return wallets[_patient];
+    }
+}
+
+
+							Project 4: Agri commodities:
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+ 
+contract AgriCommodities {
+    enum State {Created, Harvested, Stored, Sold, Delivered}
+ 
+    struct Commodity {
+        uint id;
+        string name;
+        uint quantity;
+        uint price;
+        State state;
+        address farmer;
+        address buyer;
+    }
+ 
+    mapping(uint => Commodity) public commodities;
+    uint public nextId;
+ 
+    event CommodityCreated(uint id, string name, uint quantity, address farmer);
+    event StateChanged(uint id, State state);
+    event Sold(uint id, uint price, address buyer);
+ 
+    // Farmer creates a commodity
+    function createCommodity(string memory _name, uint _quantity) public {
+        require(_quantity > 0, "Quantity must be greater than zero");
+        commodities[nextId] = Commodity(nextId, _name, _quantity, 0, State.Created, msg.sender, address(0));
+        emit CommodityCreated(nextId, _name, _quantity, msg.sender);
+        nextId++;
+    }
+ 
+    // Farmer updates the state of the commodity
+    function updateState(uint _id, State _state) public {
+        Commodity storage commodity = commodities[_id];
+        require(msg.sender == commodity.farmer, "Only farmer can update state");
+        require(_state > commodity.state, "Cannot revert to previous state");
+        commodity.state = _state;
+        emit StateChanged(_id, _state);
+    }
+ 
+    // Buyer purchases the commodity
+    function buyCommodity(uint _id) public payable {
+        Commodity storage commodity = commodities[_id];
+        require(commodity.state == State.Stored, "Commodity is not ready for sale");
+        require(msg.value >= commodity.price, "Insufficient payment");
+    
+        // Transfer payment to the farmer (added this line)
+        payable(commodity.farmer).transfer(msg.value);
+        
+        commodity.buyer = msg.sender;
+        commodity.state = State.Sold;
+        emit Sold(_id, commodity.price, msg.sender);
+    }
+ 
+    // Set price for a commodity (farmer only)
+    function setPrice(uint _id, uint _price) public {
+        Commodity storage commodity = commodities[_id];
+        require(msg.sender == commodity.farmer, "Only farmer can set price");
+        require(_price > 0, "Price must be greater than zero");
+ 
+        commodity.price = _price;
+    }
+ 
+    // View details of a commodity
+    function getCommodity(uint _id) public view returns (Commodity memory) {
+        return commodities[_id];
+    }
+}
+
+
+					Project 5: SCM
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SupplyChain {
+
+    // Enum for different states in the supply chain
+    enum State {Created, InTransit, Delivered }
+
+    // Structure to represent a product
+    struct Product {
+       
+        uint productId;
+        string name;
+        string origin;
+        uint256 manufactureDate;
+        address currentOwner;
+        State state;
+        address[] ownershipHistory;
+    }
+
+    // Mapping of product ID to Product
+    mapping(uint => Product) public products;
+
+    // Auto-incrementing ID for new products
+    uint public nextProductId = 1;
+
+    // Events for tracking lifecycle
+    event ProductCreated(uint productId, string name, address indexed owner);
+    event OwnershipTransferred(uint productId, address from, address to);
+    event ProductDelivered(uint productId, address indexed to);
+
+    // Modifier to check the caller is product owner
+    modifier onlyOwner(uint _productId) {
+        require(products[_productId].currentOwner == msg.sender, "Not product owner");
+        _;
+    }
+
+    // Function to create a product by Manufacturer
+    function createProduct(
+        string memory _name,
+        string memory _origin,
+        uint256 _manufactureDate
+    ) public {
+        // Step 1: Create the Product struct with all fields except dynamic array
+        Product storage newProduct = products[nextProductId];
+        newProduct.productId = nextProductId;
+        newProduct.name = _name;
+        newProduct.origin = _origin;
+        newProduct.manufactureDate = _manufactureDate;
+        newProduct.currentOwner = msg.sender;
+        newProduct.state = State.Created;
+
+        // Step 2: Initialize ownershipHistory by pushing current owner
+        newProduct.ownershipHistory.push(msg.sender);
+
+        emit ProductCreated(nextProductId, _name, msg.sender);
+        nextProductId++;
+    }
+
+    // Function to transfer ownership from one party to another
+    function transferOwnership(uint _productId, address _to) public onlyOwner(_productId) {
+        require(_to != address(0), "Invalid recipient");
+
+        Product storage product = products[_productId];
+        address previousOwner = product.currentOwner;
+        product.currentOwner = _to;
+        product.ownershipHistory.push(_to);
+        product.state = State.InTransit;
+
+        emit OwnershipTransferred(_productId, previousOwner, _to);
+    }
+
+    // Function to mark product as delivered to final customer
+    function markAsDelivered(uint _productId) public onlyOwner(_productId) {
+        Product storage product = products[_productId];
+        product.state = State.Delivered;
+
+        emit ProductDelivered(_productId, msg.sender);
+    }
+
+    // View function to get ownership history
+    function getOwnershipHistory(uint _productId) public view returns (address[] memory) {
+        return products[_productId].ownershipHistory;
+    }
+
+    // View function to get product details
+    function getProduct(uint _productId) public view returns (
+        uint, string memory, string memory, uint256, address, State
+    ) {
+        Product memory p = products[_productId];
+        return (p.productId, p.name, p.origin, p.manufactureDate, p.currentOwner, p.state);
     }
 }
 
