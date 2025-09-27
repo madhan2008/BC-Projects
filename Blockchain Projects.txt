@@ -408,3 +408,101 @@ contract InsuranceContract {
     }
 }
 
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract EMRwithHealthWallet {
+
+    // Medical record structure
+    struct Record {
+        string diagnosis;
+        string prescription;
+        address doctor;
+        uint256 timestamp;
+    }
+
+    // Mapping: patient => list of records
+    mapping(address => Record[]) private records;
+
+    // Mapping: patient => wallet balance
+    mapping(address => uint256) public wallets;
+
+    // Mapping: patient => (user => access granted)
+    mapping(address => mapping(address => bool)) public permissions;
+
+    // Events
+    event RecordAdded(address indexed patient, address indexed doctor, string diagnosis);
+    event AccessGranted(address indexed patient, address indexed grantee);
+    event AccessRevoked(address indexed patient, address indexed grantee);
+    event WalletDeposit(address indexed patient, uint256 amount);
+    event WalletSpent(address indexed patient, uint256 amount);
+
+    // Grant access to a doctor/hospital/insurer
+    function grantAccess(address _user) external {
+        permissions[msg.sender][_user] = true;
+        emit AccessGranted(msg.sender, _user);
+    }
+
+    // Revoke access
+    function revokeAccess(address _user) external {
+        permissions[msg.sender][_user] = false;
+        emit AccessRevoked(msg.sender, _user);
+    }
+
+    // Add medical record (only patient or authorized doctor)
+    function addRecord(address _patient, string memory _diagnosis, string memory _prescription) external {
+        require(
+            msg.sender == _patient || permissions[_patient][msg.sender],
+            "Not authorized"
+        );
+
+        records[_patient].push(
+            Record(_diagnosis, _prescription, msg.sender, block.timestamp)
+        );
+
+        emit RecordAdded(_patient, msg.sender, _diagnosis);
+    }
+
+    // Retrieve patient records (only patient or authorized)
+    function getRecords(address _patient) external view returns (Record[] memory) {
+        require(
+            msg.sender == _patient || permissions[_patient][msg.sender],
+            "Not authorized to view"
+        );
+        return records[_patient];
+    }
+
+    // Health wallet deposit
+    function depositWallet() external payable {
+        wallets[msg.sender] += msg.value;
+        emit WalletDeposit(msg.sender, msg.value);
+    }
+
+    // Spend from wallet (only patient)
+    function spendWallet(uint256 _amount, address payable _to) external {
+        require(wallets[msg.sender] >= _amount, "Insufficient balance");
+        wallets[msg.sender] -= _amount;
+        _to.transfer(_amount);
+        emit WalletSpent(msg.sender, _amount);
+    }
+
+    // Withdraw ETH back to the patient's own address
+function withdrawWallet(uint256 _amount) external {
+    require(wallets[msg.sender] >= _amount, "Insufficient balance");
+
+    // Deduct first (to prevent re-entrancy attack)
+    wallets[msg.sender] -= _amount;
+
+    // Transfer ETH back to patient
+    payable(msg.sender).transfer(_amount);
+
+    emit WalletSpent(msg.sender, _amount);
+}
+
+    // Check wallet balance
+    function getWalletBalance(address _patient) external view returns (uint256) {
+        return wallets[_patient];
+    }
+}
+
